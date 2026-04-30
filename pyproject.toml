@@ -1,0 +1,29 @@
+[project]
+name = "brain-code"
+version = "0.1.0"
+description = "Daily-notes automation: Telegram → n8n → Python on Mac Mini → Brain vault"
+readme = "README.md"
+authors = [
+    { name = "Khalifah Alsadah", email = "khalifa.kh.as@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40.0",
+    "typer>=0.12.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+brain-note = "brain_code.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

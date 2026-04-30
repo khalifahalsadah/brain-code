@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info
+
+# uv / venv
+.venv
+.uv-cache/
+
+# env
+.env
+
+# logs
+*.log
+unmatched.log
+
+# OS
+.DS_Store

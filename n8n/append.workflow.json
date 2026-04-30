@@ -1,0 +1,225 @@
+{
+  "name": "Brain — Append (Telegram → brain-note)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [-600, 0],
+      "id": "node-telegram-trigger",
+      "name": "Telegram Trigger",
+      "webhookId": "brain-append-webhook",
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "__TELEGRAM_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message.from.id }}",
+              "rightValue": "__TELEGRAM_CHAT_ID__",
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-490, 0],
+      "id": "node-if-authorized",
+      "name": "Is from me?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message.voice }}",
+              "rightValue": "",
+              "operator": { "type": "object", "operation": "exists", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-380, 0],
+      "id": "node-if-voice",
+      "name": "Is voice?"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-160, -120],
+      "id": "node-tg-getfile",
+      "name": "Telegram Get File",
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "__TELEGRAM_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {
+          "language": "ar"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [60, -120],
+      "id": "node-whisper",
+      "name": "Whisper Transcribe",
+      "credentials": {
+        "openAiApi": {
+          "id": "LFy6sGK6Omwkcn6y",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "asg-text-voice",
+              "name": "text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [280, -120],
+      "id": "node-set-voice",
+      "name": "Set text (voice)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "asg-text-text",
+              "name": "text",
+              "value": "={{ $('Telegram Trigger').item.json.message.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [60, 120],
+      "id": "node-set-text",
+      "name": "Set text (text)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.item.json.text || '';\nconst b64 = Buffer.from(text, 'utf-8').toString('base64');\nreturn { json: { text, b64text: b64, chatId: $('Telegram Trigger').item.json.message.chat.id } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0],
+      "id": "node-code-b64",
+      "name": "Encode b64"
+    },
+    {
+      "parameters": {
+        "resource": "command",
+        "command": "=cd /Users/khalifah/Projects/brain-code && echo \"{{ $json.b64text }}\" | base64 -d | ./.venv/bin/brain-note append --stdin"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [940, 0],
+      "id": "node-ssh",
+      "name": "SSH brain-note append",
+      "credentials": {
+        "sshPassword": {
+          "id": "Ma01t49mvNyUvpeV",
+          "name": "Mac Mini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Encode b64').item.json.chatId }}",
+        "text": "={{ $json.stdout || $json.stderr || 'no output' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1160, 0],
+      "id": "node-tg-reply",
+      "name": "Telegram Reply",
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "__TELEGRAM_CRED_NAME__"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{ "node": "Is from me?", "type": "main", "index": 0 }]]
+    },
+    "Is from me?": {
+      "main": [
+        [{ "node": "Is voice?", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Is voice?": {
+      "main": [
+        [{ "node": "Telegram Get File", "type": "main", "index": 0 }],
+        [{ "node": "Set text (text)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram Get File": {
+      "main": [[{ "node": "Whisper Transcribe", "type": "main", "index": 0 }]]
+    },
+    "Whisper Transcribe": {
+      "main": [[{ "node": "Set text (voice)", "type": "main", "index": 0 }]]
+    },
+    "Set text (voice)": {
+      "main": [[{ "node": "Encode b64", "type": "main", "index": 0 }]]
+    },
+    "Set text (text)": {
+      "main": [[{ "node": "Encode b64", "type": "main", "index": 0 }]]
+    },
+    "Encode b64": {
+      "main": [[{ "node": "SSH brain-note append", "type": "main", "index": 0 }]]
+    },
+    "SSH brain-note append": {
+      "main": [[{ "node": "Telegram Reply", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

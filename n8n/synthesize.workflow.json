@@ -1,0 +1,48 @@
+{
+  "name": "Brain — Synthesize (nightly 04:05 Asia/Riyadh)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5 4 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-300, 0],
+      "id": "node-schedule",
+      "name": "Cron 04:05 Riyadh"
+    },
+    {
+      "parameters": {
+        "resource": "command",
+        "command": "cd /Users/khalifah/Projects/brain-code && ./.venv/bin/brain-note synthesize"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [-80, 0],
+      "id": "node-ssh-synth",
+      "name": "SSH brain-note synthesize",
+      "credentials": {
+        "sshPassword": {
+          "id": "Ma01t49mvNyUvpeV",
+          "name": "Mac Mini"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 04:05 Riyadh": {
+      "main": [[{ "node": "SSH brain-note synthesize", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Riyadh"
+  }
+}
