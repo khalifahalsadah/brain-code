@@ -8,6 +8,7 @@ from brain_code.files import (
     append_to_auto_region,
     daily_note_path,
     ensure_daily_note,
+    pop_last_bullet,
     read_auto_region,
     replace_auto_region,
 )
@@ -140,6 +141,62 @@ def test_replace_auto_region_preserves_outside(settings: Settings):
     assert "- polished two" in content
     assert "<!-- auto-region -->" in content
     assert "<!-- /auto-region -->" in content
+
+
+def test_pop_last_bullet_single(settings: Settings):
+    path = settings.vault_root / "test.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "# 📝 Notes\n<!-- auto-region -->\n- one\n- two\n<!-- /auto-region -->\n",
+        encoding="utf-8",
+    )
+    removed = pop_last_bullet(path)
+    assert removed == "- two"
+    content = path.read_text(encoding="utf-8")
+    assert "- one" in content
+    assert "- two" not in content
+
+
+def test_pop_last_bullet_with_nested(settings: Settings):
+    path = settings.vault_root / "test.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "# 📝 Notes\n<!-- auto-region -->\n- parent\n\t- child A\n\t- child B\n<!-- /auto-region -->\n",
+        encoding="utf-8",
+    )
+    removed = pop_last_bullet(path)
+    assert "- parent" in removed
+    assert "child A" in removed
+    assert "child B" in removed
+    content = path.read_text(encoding="utf-8")
+    assert "parent" not in content
+    assert "child A" not in content
+
+
+def test_pop_last_bullet_keeps_earlier_bullets(settings: Settings):
+    path = settings.vault_root / "test.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "# 📝 Notes\n<!-- auto-region -->\n- first\n- middle\n\t- nested\n- last\n<!-- /auto-region -->\n",
+        encoding="utf-8",
+    )
+    removed = pop_last_bullet(path)
+    assert removed == "- last"
+    content = path.read_text(encoding="utf-8")
+    assert "- first" in content
+    assert "- middle" in content
+    assert "\t- nested" in content
+    assert "- last" not in content
+
+
+def test_pop_last_bullet_empty_region(settings: Settings):
+    path = settings.vault_root / "test.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "# 📝 Notes\n<!-- auto-region -->\n<!-- /auto-region -->\n",
+        encoding="utf-8",
+    )
+    assert pop_last_bullet(path) is None
 
 
 def test_replace_auto_region_raises_without_markers(settings: Settings):

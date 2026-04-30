@@ -62,6 +62,29 @@ def read_auto_region(path: Path) -> str:
     return match.group(1)
 
 
+def pop_last_bullet(path: Path) -> str | None:
+    """Remove the last top-level bullet (and any trailing nested lines) from auto-region.
+
+    Returns the removed text, or None if there's nothing to undo.
+    """
+    inner = read_auto_region(path)
+    lines = inner.rstrip("\n").splitlines()
+
+    last_idx: int | None = None
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].startswith("- "):
+            last_idx = i
+            break
+
+    if last_idx is None:
+        return None
+
+    removed = "\n".join(lines[last_idx:])
+    new_inner = "\n".join(lines[:last_idx])
+    replace_auto_region(path, new_inner)
+    return removed
+
+
 def replace_auto_region(path: Path, new_inner: str) -> None:
     """Replace content between auto-region markers atomically. Preserves markers."""
     content = path.read_text(encoding="utf-8")

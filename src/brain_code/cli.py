@@ -17,10 +17,12 @@ from .files import (
     append_to_auto_region,
     daily_note_path,
     ensure_daily_note,
+    pop_last_bullet,
     read_auto_region,
     replace_auto_region,
 )
 from .recall import recall as recall_fn
+from .search import search as search_fn
 from .stubs import create_stub, log_unmatched, parse_unknown_flags, strip_unknown_flags
 from .style import find_recent_daily_notes, style_examples_text
 from .wikilinks import gather_context, list_known_names, match_entities
@@ -128,6 +130,38 @@ def recall(
     """Read-only retrieval — used by Telegram slash commands."""
     settings = load_settings()
     typer.echo(recall_fn(period, settings))
+
+
+@app.command()
+def search(
+    term: str = typer.Option(None, "--term", help="Search term"),
+    b64: str = typer.Option(None, "--b64", help="Base64-encoded search term"),
+) -> None:
+    """Grep daily-note bullets for a term."""
+    if b64:
+        import base64
+
+        term = base64.b64decode(b64).decode("utf-8")
+    if not term:
+        raise typer.BadParameter("provide --term or --b64")
+    settings = load_settings()
+    typer.echo(search_fn(term, settings))
+
+
+@app.command()
+def undo() -> None:
+    """Remove the last bullet from today's auto-region."""
+    settings = load_settings()
+    target = target_date_for_append()
+    path = daily_note_path(settings, target)
+    if not path.exists():
+        typer.echo(f"📭 no daily note for {target.isoformat()}")
+        return
+    removed = pop_last_bullet(path)
+    if removed is None:
+        typer.echo("📭 nothing to undo")
+        return
+    typer.echo(f"↶ removed:\n{removed}")
 
 
 def _resolve_input(text: str | None, stdin: bool) -> str:

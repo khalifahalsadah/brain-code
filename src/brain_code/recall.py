@@ -56,6 +56,8 @@ def _help() -> str:
         "/today — show today's captured bullets\n"
         "/yesterday — show yesterday's bullets\n"
         "/week — bullet counts for the last 7 days\n"
+        "/search <term> — find bullets across all daily notes\n"
+        "/undo — remove the last bullet from today\n"
         "/help — this message\n\n"
         "Anything else (text or voice) is appended to today's daily note."
     )

@@ -161,7 +161,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const text = $input.item.json.text || '';\nconst m = text.trim().match(/^\\/(\\w+)/);\nconst command = m ? m[1] : 'help';\nreturn { json: { command } };"
+        "jsCode": "const text = $input.item.json.text || '';\nconst m = text.trim().match(/^\\/(\\w+)(?:\\s+([\\s\\S]*))?$/);\nconst cmd = (m ? m[1] : 'help').toLowerCase();\nconst args = (m && m[2]) ? m[2].trim() : '';\n\nlet cli;\nif (['today', 'yesterday', 'week', 'help'].includes(cmd)) {\n  cli = `recall ${cmd}`;\n} else if (cmd === 'search') {\n  if (!args) {\n    cli = 'recall help';\n  } else {\n    const b64 = Buffer.from(args, 'utf-8').toString('base64');\n    cli = `search --b64 ${b64}`;\n  }\n} else if (cmd === 'undo') {\n  cli = 'undo';\n} else {\n  cli = `recall ${cmd}`;\n}\n\nreturn { json: { cli } };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -172,13 +172,13 @@
     {
       "parameters": {
         "resource": "command",
-        "command": "=cd /Users/khalifah/Projects/brain-code && ./.venv/bin/brain-note recall {{ $json.command }}"
+        "command": "=cd /Users/khalifah/Projects/brain-code && ./.venv/bin/brain-note {{ $json.cli }}"
       },
       "type": "n8n-nodes-base.ssh",
       "typeVersion": 1,
       "position": [940, -120],
       "id": "node-ssh-recall",
-      "name": "SSH brain-note recall",
+      "name": "SSH brain-note slash",
       "credentials": {
         "sshPassword": {
           "id": "Ma01t49mvNyUvpeV",
@@ -269,9 +269,9 @@
       ]
     },
     "Extract command": {
-      "main": [[{ "node": "SSH brain-note recall", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "SSH brain-note slash", "type": "main", "index": 0 }]]
     },
-    "SSH brain-note recall": {
+    "SSH brain-note slash": {
       "main": [[{ "node": "Telegram Reply", "type": "main", "index": 0 }]]
     },
     "Encode b64": {
