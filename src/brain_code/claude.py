@@ -75,6 +75,79 @@ def synthesize_pass(
     return _extract_text(response).strip()
 
 
+def extract_logs(
+    raw_text: str,
+    known_restaurants: str,
+    settings: Settings | None = None,
+) -> list[dict]:
+    """Detect structured side-effect logs in a captured message via tool_use.
+
+    Returns the `logs` array. Empty list if nothing structured was detected.
+    """
+    s = settings or load_settings()
+    if not s.api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    client = Anthropic(api_key=s.api_key)
+    system = load_prompt("extract_logs_system.md", s)
+    user = render(
+        "extract_logs_user.md.tmpl",
+        s,
+        raw_text=raw_text,
+        known_restaurants=known_restaurants or "(none yet)",
+    )
+    tool = {
+        "name": "record_logs",
+        "description": (
+            "Record structured side-effect logs detected in the captured message. "
+            "Always called exactly once per message."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["restaurant_visit"],
+                            },
+                            "entity": {"type": "string"},
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "rating": {"type": "number"},
+                                    },
+                                    "required": ["name"],
+                                },
+                            },
+                            "overall": {"type": "number"},
+                        },
+                        "required": ["type", "entity"],
+                    },
+                },
+            },
+            "required": ["logs"],
+        },
+    }
+    response = client.messages.create(
+        model=APPEND_MODEL,
+        max_tokens=1024,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        tools=[tool],
+        tool_choice={"type": "tool", "name": "record_logs"},
+    )
+    for block in response.content:
+        if getattr(block, "type", None) == "tool_use" and block.name == "record_logs":
+            return block.input.get("logs", [])
+    return []
+
+
 def _extract_text(response) -> str:
     for block in response.content:
         if getattr(block, "type", None) == "text":

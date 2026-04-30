@@ -199,13 +199,13 @@
     {
       "parameters": {
         "resource": "command",
-        "command": "=cd /Users/khalifah/Projects/brain-code && echo \"{{ $json.b64text }}\" | base64 -d | ./.venv/bin/brain-note append --stdin"
+        "command": "=cd /Users/khalifah/Projects/brain-code && echo \"{{ $json.b64text }}\" | base64 -d | ./.venv/bin/brain-note capture --stdin"
       },
       "type": "n8n-nodes-base.ssh",
       "typeVersion": 1,
       "position": [940, 0],
       "id": "node-ssh",
-      "name": "SSH brain-note append",
+      "name": "SSH brain-note capture",
       "credentials": {
         "sshPassword": {
           "id": "Ma01t49mvNyUvpeV",
@@ -275,9 +275,9 @@
       "main": [[{ "node": "Telegram Reply", "type": "main", "index": 0 }]]
     },
     "Encode b64": {
-      "main": [[{ "node": "SSH brain-note append", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "SSH brain-note capture", "type": "main", "index": 0 }]]
     },
-    "SSH brain-note append": {
+    "SSH brain-note capture": {
       "main": [[{ "node": "Telegram Reply", "type": "main", "index": 0 }]]
     }
   },

@@ -5,6 +5,7 @@ from datetime import date as date_cls
 
 import typer
 
+from .capture import capture as capture_fn
 from .claude import append_pass, synthesize_pass
 from .config import load_settings
 from .dates import (
@@ -118,6 +119,21 @@ def synthesize(
     replace_auto_region(note_path, polished)
     excerpt = polished[:200].replace("\n", " ")
     typer.echo(f"📝 {target.isoformat()} synthesized: {excerpt}…")
+
+
+@app.command()
+def capture(
+    text: str = typer.Option(None, "--text", help="Raw input text"),
+    stdin: bool = typer.Option(False, "--stdin", help="Read raw input from stdin"),
+) -> None:
+    """Append bullet to daily note + fire structured side-effects (e.g., restaurant visit log)."""
+    raw = _resolve_input(text, stdin)
+    if not raw.strip():
+        typer.echo("✗ empty input")
+        raise typer.Exit(code=1)
+    settings = load_settings()
+    result = capture_fn(raw, settings)
+    typer.echo(result.render())
 
 
 @app.command()
