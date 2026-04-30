@@ -106,8 +106,36 @@ def test_capture_appends_bullet_and_logs_restaurant(
 
     rendered = result.render()
     assert "- جربت [[كرم]] برجر 7/10" in rendered
-    assert "🆕" in rendered or "🍽" in rendered
+    assert "🆕" in rendered  # newly created
     assert "كرم" in rendered
+
+
+def test_capture_creates_entity_file_before_bullet_pass(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    """Regression: entity file must exist by the time append_pass runs so Haiku
+    sees it as a known entity and wraps it in wikilinks."""
+    today = date(2026, 4, 30)
+    monkeypatch.setattr("brain_code.capture.target_date_for_append", lambda: today)
+
+    seen_food_files: list[list[str]] = []
+
+    def fake_append_pass(*args, **kwargs):
+        food_dir = settings.vault_root / "01 Area/Food"
+        seen_food_files.append([p.stem for p in food_dir.glob("*.md")])
+        return "- bullet"
+
+    monkeypatch.setattr("brain_code.capture.append_pass", fake_append_pass)
+    monkeypatch.setattr(
+        "brain_code.capture.extract_logs",
+        lambda *a, **kw: [
+            {"type": "restaurant_visit", "entity": "لغاويص", "items": [{"name": "شاورما", "rating": 10}]}
+        ],
+    )
+
+    capture("طلبت من لغاويص شاورما 10/10", settings)
+
+    assert seen_food_files == [["لغاويص"]]  # File existed when append_pass was called
 
 
 def test_capture_no_side_effects_when_logs_empty(

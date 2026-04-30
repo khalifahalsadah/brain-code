@@ -29,15 +29,36 @@ class CaptureResult:
 
 
 def capture(raw_text: str, settings: Settings) -> CaptureResult:
-    """Run the full capture pipeline: append a bullet AND fire structured side-effects."""
+    """Capture pipeline: extract logs first, pre-create entities, then bullet, then visits.
+
+    Order matters: structured-log extraction runs before the bullet pass so that any
+    new entity files (e.g., a new restaurant) exist by the time the bullet pass loads
+    the registry. This way Haiku sees the entity in its known list and wraps it in
+    `[[ ]]` correctly.
+    """
     target = target_date_for_append()
+
+    # Pass 1: detect structured side-effect logs
+    pre_registry = load_registry(settings)
+    known_restaurants = _restaurant_names(pre_registry)
+    logs = extract_logs(raw_text, known_restaurants, settings)
+
+    # Pre-create entity files for each detected log so they join the registry
+    created_state: dict[tuple[str, str], bool] = {}
+    for log in logs:
+        if log.get("type") == "restaurant_visit":
+            entity = log.get("entity", "").strip()
+            if entity:
+                created_state[("restaurant_visit", entity)] = restaurant.ensure_file(entity, settings)
+
+    # Pass 2: bullet generation with the now-updated registry
     registry = load_registry(settings)
     matched = match_entities(raw_text, registry)
     matched_ctx = gather_context(matched)
     known_names = list_known_names(registry)
-
     bullet = append_pass(raw_text, matched_ctx, known_names, settings)
 
+    # Auto-stubs for any unknown people/food that Haiku flagged
     flags = parse_unknown_flags(bullet)
     bullet_clean = strip_unknown_flags(bullet)
     for type_, name in flags:
@@ -46,16 +67,24 @@ def capture(raw_text: str, settings: Settings) -> CaptureResult:
         else:
             log_unmatched(settings, type_, name)
 
+    # Append bullet to daily note
     note_path = ensure_daily_note(settings, target)
     append_to_auto_region(note_path, bullet_clean)
 
-    known_restaurants = _restaurant_names(registry)
-    logs = extract_logs(raw_text, known_restaurants, settings)
-
+    # Pass 3: append visit details to entity files
     side_effects: list[str] = []
     for log in logs:
         if log.get("type") == "restaurant_visit":
-            msg = restaurant.handle(log, settings, target)
+            entity = log.get("entity", "").strip()
+            if not entity:
+                continue
+            msg = restaurant.append_visit(
+                entity,
+                log,
+                settings,
+                target,
+                was_created=created_state.get(("restaurant_visit", entity), False),
+            )
             if msg:
                 side_effects.append(msg)
 

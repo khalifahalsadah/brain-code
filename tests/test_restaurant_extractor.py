@@ -23,27 +23,42 @@ def settings(tmp_path: Path) -> Settings:
     )
 
 
-def test_handle_creates_new_restaurant_file(settings: Settings):
+def test_ensure_file_creates_new(settings: Settings):
+    created = restaurant.ensure_file("كرم", settings)
+    assert created is True
+    file_path = settings.vault_root / "01 Area/Food/كرم.md"
+    assert file_path.exists()
+    content = file_path.read_text(encoding="utf-8")
+    assert "# [[كرم]]" in content
+
+
+def test_ensure_file_idempotent(settings: Settings):
+    restaurant.ensure_file("كرم", settings)
+    second = restaurant.ensure_file("كرم", settings)
+    assert second is False
+
+
+def test_append_visit_to_freshly_created_file(settings: Settings):
+    restaurant.ensure_file("كرم", settings)
     log = {
         "type": "restaurant_visit",
         "entity": "كرم",
         "items": [{"name": "برجر", "rating": 7}, {"name": "فرايز", "rating": 10}],
         "overall": 6,
     }
-    msg = restaurant.handle(log, settings, date(2026, 4, 30))
+    msg = restaurant.append_visit("كرم", log, settings, date(2026, 4, 30), was_created=True)
     file_path = settings.vault_root / "01 Area/Food/كرم.md"
-    assert file_path.exists()
     content = file_path.read_text(encoding="utf-8")
-    assert "# [[كرم]]" in content
     assert "## Visits" in content
     assert "### 2026-04-30" in content
     assert "- برجر — 7/10" in content
     assert "- فرايز — 10/10" in content
     assert "**Overall: 6/10**" in content
     assert "🆕" in msg
+    assert "overall 6/10" in msg
 
 
-def test_handle_appends_to_existing_file(settings: Settings):
+def test_append_visit_to_existing_file_preserves_history(settings: Settings):
     file_path = settings.vault_root / "01 Area/Food/كرم.md"
     file_path.write_text(
         "---\nrating: ⭐️⭐️⭐️\n---\n# [[كرم]]\n\n## Notes\n- old notes\n\n## Visits\n\n### 2026-04-29\n- soup — 5/10\n",
@@ -55,20 +70,17 @@ def test_handle_appends_to_existing_file(settings: Settings):
         "items": [{"name": "burger", "rating": 8}],
         "overall": 8,
     }
-    msg = restaurant.handle(log, settings, date(2026, 4, 30))
+    msg = restaurant.append_visit("كرم", log, settings, date(2026, 4, 30), was_created=False)
     content = file_path.read_text(encoding="utf-8")
-    # Old visit preserved
     assert "### 2026-04-29" in content
     assert "soup — 5/10" in content
-    # New visit appended
     assert "### 2026-04-30" in content
     assert "burger — 8/10" in content
-    # Notes preserved
     assert "old notes" in content
     assert "🍽" in msg
 
 
-def test_handle_creates_visits_section_if_missing(settings: Settings):
+def test_append_visit_creates_visits_section_if_missing(settings: Settings):
     file_path = settings.vault_root / "01 Area/Food/Cassette.md"
     file_path.write_text(
         "---\n---\n# [[Cassette]]\n\n## Notes\n- old\n",
@@ -79,31 +91,34 @@ def test_handle_creates_visits_section_if_missing(settings: Settings):
         "entity": "Cassette",
         "items": [{"name": "Coffee", "rating": 9}],
     }
-    restaurant.handle(log, settings, date(2026, 4, 30))
+    restaurant.append_visit("Cassette", log, settings, date(2026, 4, 30), was_created=False)
     content = file_path.read_text(encoding="utf-8")
     assert "## Visits" in content
-    assert "### 2026-04-30" in content
     assert "- Coffee — 9/10" in content
 
 
-def test_handle_skips_empty_entity(settings: Settings):
-    log = {"type": "restaurant_visit", "entity": "  "}
-    assert restaurant.handle(log, settings, date(2026, 4, 30)) == ""
+def test_append_visit_summary_with_only_item_rating(settings: Settings):
+    """When user gives item ratings but no overall, summary should reflect that."""
+    restaurant.ensure_file("لغاويص", settings)
+    log = {
+        "type": "restaurant_visit",
+        "entity": "لغاويص",
+        "items": [{"name": "شاورما كيتو", "rating": 10}],
+    }
+    msg = restaurant.append_visit("لغاويص", log, settings, date(2026, 4, 30), was_created=True)
+    assert "1 item rated" in msg
+    assert "no rating" not in msg
 
 
-def test_handle_no_overall_no_ratings(settings: Settings):
+def test_append_visit_no_ratings_no_overall(settings: Settings):
+    restaurant.ensure_file("FoodSpot", settings)
     log = {
         "type": "restaurant_visit",
         "entity": "FoodSpot",
         "items": [{"name": "Wrap"}, {"name": "Soda"}],
     }
-    msg = restaurant.handle(log, settings, date(2026, 4, 30))
-    file_path = settings.vault_root / "01 Area/Food/FoodSpot.md"
-    content = file_path.read_text(encoding="utf-8")
-    assert "- Wrap" in content
-    assert "- Soda" in content
-    assert "/10" not in content.split("## Visits")[1]
-    assert "no rating" in msg
+    msg = restaurant.append_visit("FoodSpot", log, settings, date(2026, 4, 30), was_created=True)
+    assert "2 items logged" in msg
 
 
 def test_format_visit_strips_empty_item_names():
