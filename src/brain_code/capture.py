@@ -9,7 +9,7 @@ from .dates import (
     target_date_for_append,
 )
 from .entities import load_registry
-from .extractors import restaurant
+from .extractors import movie, restaurant
 from .files import append_to_auto_region, ensure_daily_note
 from .stubs import create_stub, log_unmatched, parse_unknown_flags, strip_unknown_flags
 from .wikilinks import gather_context, list_known_names, match_entities
@@ -40,16 +40,29 @@ def capture(raw_text: str, settings: Settings) -> CaptureResult:
 
     # Pass 1: detect structured side-effect logs
     pre_registry = load_registry(settings)
-    known_restaurants = _restaurant_names(pre_registry)
-    logs = extract_logs(raw_text, known_restaurants, settings)
+    known_restaurants = _names_by_type(pre_registry, "food")
+    known_movies_tv = _names_by_type(pre_registry, "movies_tv")
+    logs = extract_logs(raw_text, known_restaurants, known_movies_tv, settings)
 
-    # Pre-create entity files for each detected log so they join the registry
+    # Pre-create entity files for each detected log so they join the registry.
+    # Movies use OMDB canonical title (which may differ from raw user title).
     created_state: dict[tuple[str, str], bool] = {}
+    canonical_movie_titles: dict[str, str] = {}  # raw -> canonical
+    movie_omdb_data: dict[str, dict | None] = {}  # canonical -> omdb dict
     for log in logs:
-        if log.get("type") == "restaurant_visit":
-            entity = log.get("entity", "").strip()
-            if entity:
-                created_state[("restaurant_visit", entity)] = restaurant.ensure_file(entity, settings)
+        log_type = log.get("type")
+        entity = log.get("entity", "").strip()
+        if not entity:
+            continue
+        if log_type == "restaurant_visit":
+            created_state[("restaurant_visit", entity)] = restaurant.ensure_file(entity, settings)
+        elif log_type == "movie_watched":
+            was_created, canonical, omdb_data = movie.ensure_file(
+                entity, settings, kind_hint=log.get("kind")
+            )
+            canonical_movie_titles[entity] = canonical
+            movie_omdb_data[canonical] = omdb_data
+            created_state[("movie_watched", canonical)] = was_created
 
     # Pass 2: bullet generation with the now-updated registry
     registry = load_registry(settings)
@@ -71,19 +84,31 @@ def capture(raw_text: str, settings: Settings) -> CaptureResult:
     note_path = ensure_daily_note(settings, target)
     append_to_auto_region(note_path, bullet_clean)
 
-    # Pass 3: append visit details to entity files
+    # Pass 3: append visit / watch details to entity files
     side_effects: list[str] = []
     for log in logs:
-        if log.get("type") == "restaurant_visit":
-            entity = log.get("entity", "").strip()
-            if not entity:
-                continue
+        log_type = log.get("type")
+        entity = log.get("entity", "").strip()
+        if not entity:
+            continue
+        if log_type == "restaurant_visit":
             msg = restaurant.append_visit(
                 entity,
                 log,
                 settings,
                 target,
                 was_created=created_state.get(("restaurant_visit", entity), False),
+            )
+            if msg:
+                side_effects.append(msg)
+        elif log_type == "movie_watched":
+            canonical = canonical_movie_titles.get(entity, entity)
+            msg = movie.append_watch(
+                canonical,
+                log,
+                settings,
+                target,
+                was_created=created_state.get(("movie_watched", canonical), False),
             )
             if msg:
                 side_effects.append(msg)
@@ -95,8 +120,8 @@ def capture(raw_text: str, settings: Settings) -> CaptureResult:
     )
 
 
-def _restaurant_names(registry) -> str:
-    names = sorted({e.name for e in registry if e.type == "food"})
+def _names_by_type(registry, type_: str) -> str:
+    names = sorted({e.name for e in registry if e.type == type_})
     if not names:
-        return "(no restaurants in vault yet)"
+        return f"(no {type_} entities in vault yet)"
     return "\n".join(f"- {n}" for n in names)

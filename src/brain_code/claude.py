@@ -78,6 +78,7 @@ def synthesize_pass(
 def extract_logs(
     raw_text: str,
     known_restaurants: str,
+    known_movies_tv: str,
     settings: Settings | None = None,
 ) -> list[dict]:
     """Detect structured side-effect logs in a captured message via tool_use.
@@ -94,6 +95,7 @@ def extract_logs(
         s,
         raw_text=raw_text,
         known_restaurants=known_restaurants or "(none yet)",
+        known_movies_tv=known_movies_tv or "(none yet)",
     )
     tool = {
         "name": "record_logs",
@@ -111,7 +113,7 @@ def extract_logs(
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": ["restaurant_visit"],
+                                "enum": ["restaurant_visit", "movie_watched"],
                             },
                             "entity": {"type": "string"},
                             "items": {
@@ -126,6 +128,14 @@ def extract_logs(
                                 },
                             },
                             "overall": {"type": "number"},
+                            "kind": {
+                                "type": "string",
+                                "enum": ["movie", "tv"],
+                            },
+                            "rating": {"type": "number"},
+                            "season": {"type": "number"},
+                            "episode": {"type": "number"},
+                            "notes": {"type": "string"},
                         },
                         "required": ["type", "entity"],
                     },

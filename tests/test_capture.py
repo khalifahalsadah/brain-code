@@ -78,7 +78,7 @@ def test_capture_appends_bullet_and_logs_restaurant(
     )
     monkeypatch.setattr(
         "brain_code.capture.extract_logs",
-        lambda *a, **kw: [
+        lambda *args, **kwargs: [
             {
                 "type": "restaurant_visit",
                 "entity": "كرم",
@@ -128,7 +128,7 @@ def test_capture_creates_entity_file_before_bullet_pass(
     monkeypatch.setattr("brain_code.capture.append_pass", fake_append_pass)
     monkeypatch.setattr(
         "brain_code.capture.extract_logs",
-        lambda *a, **kw: [
+        lambda *args, **kwargs: [
             {"type": "restaurant_visit", "entity": "لغاويص", "items": [{"name": "شاورما", "rating": 10}]}
         ],
     )
@@ -168,7 +168,7 @@ def test_capture_multiple_restaurant_visits(
     )
     monkeypatch.setattr(
         "brain_code.capture.extract_logs",
-        lambda *a, **kw: [
+        lambda *args, **kwargs: [
             {"type": "restaurant_visit", "entity": "A", "overall": 8},
             {"type": "restaurant_visit", "entity": "B", "overall": 5},
         ],
@@ -187,7 +187,7 @@ def test_capture_unknown_log_type_ignored(
     monkeypatch.setattr("brain_code.capture.append_pass", lambda *a, **kw: "- bullet")
     monkeypatch.setattr(
         "brain_code.capture.extract_logs",
-        lambda *a, **kw: [{"type": "future_type_we_dont_handle", "entity": "X"}],
+        lambda *args, **kwargs: [{"type": "future_type_we_dont_handle", "entity": "X"}],
     )
     result = capture("something", settings)
     assert result.side_effects == []
