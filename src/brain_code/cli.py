@@ -20,6 +20,7 @@ from .files import (
     read_auto_region,
     replace_auto_region,
 )
+from .recall import recall as recall_fn
 from .stubs import create_stub, log_unmatched, parse_unknown_flags, strip_unknown_flags
 from .style import find_recent_daily_notes, style_examples_text
 from .wikilinks import gather_context, list_known_names, match_entities
@@ -115,6 +116,18 @@ def synthesize(
     replace_auto_region(note_path, polished)
     excerpt = polished[:200].replace("\n", " ")
     typer.echo(f"📝 {target.isoformat()} synthesized: {excerpt}…")
+
+
+@app.command()
+def recall(
+    period: str = typer.Argument(
+        "today",
+        help="today | yesterday | week | help (leading slash optional)",
+    ),
+) -> None:
+    """Read-only retrieval — used by Telegram slash commands."""
+    settings = load_settings()
+    typer.echo(recall_fn(period, settings))
 
 
 def _resolve_input(text: str | None, stdin: bool) -> str:

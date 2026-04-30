@@ -140,11 +140,59 @@
     },
     {
       "parameters": {
-        "jsCode": "const text = $input.item.json.text || '';\nconst b64 = Buffer.from(text, 'utf-8').toString('base64');\nreturn { json: { text, b64text: b64, chatId: $('Telegram Trigger').item.json.message.chat.id } };"
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "/",
+              "operator": { "type": "string", "operation": "startsWith" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [500, 0],
+      "id": "node-if-slash",
+      "name": "Is slash command?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.item.json.text || '';\nconst m = text.trim().match(/^\\/(\\w+)/);\nconst command = m ? m[1] : 'help';\nreturn { json: { command } };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 0],
+      "position": [720, -120],
+      "id": "node-code-cmd",
+      "name": "Extract command"
+    },
+    {
+      "parameters": {
+        "resource": "command",
+        "command": "=cd /Users/khalifah/Projects/brain-code && ./.venv/bin/brain-note recall {{ $json.command }}"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [940, -120],
+      "id": "node-ssh-recall",
+      "name": "SSH brain-note recall",
+      "credentials": {
+        "sshPassword": {
+          "id": "Ma01t49mvNyUvpeV",
+          "name": "Mac Mini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.item.json.text || '';\nconst b64 = Buffer.from(text, 'utf-8').toString('base64');\nreturn { json: { text, b64text: b64 } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 120],
       "id": "node-code-b64",
       "name": "Encode b64"
     },
@@ -167,7 +215,7 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $('Encode b64').item.json.chatId }}",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
         "text": "={{ $json.stdout || $json.stderr || 'no output' }}",
         "additionalFields": {
           "appendAttribution": false
@@ -212,7 +260,19 @@
       "main": [[{ "node": "Encode b64", "type": "main", "index": 0 }]]
     },
     "Set text (text)": {
-      "main": [[{ "node": "Encode b64", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Is slash command?", "type": "main", "index": 0 }]]
+    },
+    "Is slash command?": {
+      "main": [
+        [{ "node": "Extract command", "type": "main", "index": 0 }],
+        [{ "node": "Encode b64", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract command": {
+      "main": [[{ "node": "SSH brain-note recall", "type": "main", "index": 0 }]]
+    },
+    "SSH brain-note recall": {
+      "main": [[{ "node": "Telegram Reply", "type": "main", "index": 0 }]]
     },
     "Encode b64": {
       "main": [[{ "node": "SSH brain-note append", "type": "main", "index": 0 }]]
